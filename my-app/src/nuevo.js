@@ -1,149 +1,117 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "./App.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faShoppingCart } from "@fortawesome/free-solid-svg-icons";
-
-function ShoppingCart({ cart, isOpen, onClose, removeFromCart, calculateTotal }) {
-  if (!isOpen) return null;
-
-  return (
-    <div className="shopping-cart">
-      <h2>Carrito de Compras</h2>
-      <ul>
-        {cart.map((product) => (
-          <li key={product.id} className="cart-item">
-            <div className="cart-item-image">
-              <img src={product.image} alt={product.title} />
-            </div>
-            <div className="cart-item-info">
-              <p>{product.title}</p>
-              <p className="price">${product.price}</p>
-            </div>
-            <button onClick={() => removeFromCart(product)}>Eliminar</button>
-          </li>
-        ))}
-      </ul>
-      <div className="cart-total">
-        <p>Total: ${calculateTotal(cart).toFixed(2)}</p>
-      </div>
-      <button onClick={onClose}>Cerrar Carrito</button>
-    </div>
-  );
-}
-
+import { useAppContext } from "./AppContext";
+import ShoppingCart from "./ShoppingCart";
 function Stock() {
-  const [showAllProducts, setShowAllProducts] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [user, setUser] = useState(null);
-  const [showUserInfo, setShowUserInfo] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [cart, setCart] = useState([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-
+  const { state, dispatch } = useAppContext();
+  const [categories, setCategories] = useState([]);
+  const [showCategoryPopup, setShowCategoryPopup] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
   useEffect(() => {
     async function fetchData() {
       try {
         const productsResponse = await fetch("https://fakestoreapi.com/products");
         const productsData = await productsResponse.json();
-        setProducts(productsData);
-
+        dispatch({ type: "SET_PRODUCTS", payload: productsData });
         const userResponse = await fetch("https://fakestoreapi.com/users/1");
         const userData = await userResponse.json();
-        setUser(userData);
+        dispatch({ type: "SET_USER", payload: userData });
       } catch (err) {
         console.error("Error fetching data", err);
-        setUser(null);
+        dispatch({ type: "SET_USER", payload: null });
       }
     }
     fetchData();
-  }, []);
+  }, [dispatch]);
 
-  const toggleUserInfo = () => {
-    setShowUserInfo(!showUserInfo);
+  useEffect(() => {
+    const uniqueCategories = [...new Set(state.products.map(product => product.category))];
+    setCategories(uniqueCategories);
+  }, [state.products]);
+  const toggleCategoryPopup = () => {
+    setShowCategoryPopup(!showCategoryPopup);
   };
-
-  const openProductInfo = (product) => {
-    setSelectedProduct(product);
+  const filterProductsByCategory = (category) => {
+    setSelectedCategory(category);
+    setShowCategoryPopup(false); // Oculta el menú de categorías al seleccionar una categoría
   };
-
-  const addToCart = (product) => {
-    const updatedCart = [...cart, product];
-    setCart(updatedCart);
-    localStorage.setItem("cart", JSON.stringify(updatedCart));
+  const resetCategoryFilter = () => {
+    setSelectedCategory("");
   };
-
-  const removeFromCart = (productToRemove) => {
-    const updatedCart = cart.filter((product) => product.id !== productToRemove.id);
-    setCart(updatedCart);
-    localStorage.setItem("cart", JSON.stringify(updatedCart));
-  };
-
-  const removeAllFromCart = () => {
-    setCart([]);
-    localStorage.removeItem("cart");
-  };
-
-  const toggleCart = () => {
-    setIsCartOpen(!isCartOpen);
-  };
-
-  const showCart = () => {
-    const cartData = JSON.parse(localStorage.getItem("cart"));
-    if (cartData) {
-      setCart(cartData);
-    }
-    setIsCartOpen(true);
-  };
-  const calculateTotal = (cart) => {
-    return cart.reduce((total, product) => total + product.price, 0);
-  };
-
+  const filteredProducts = selectedCategory
+    ? state.products.filter(product => product.category === selectedCategory)
+    : state.products;
   return (
     <div className="container">
       <header className="header">
-        <h1>Mi Tienda Online</h1>
+        <h1>H.L.A.P SHOP</h1>
         <div className="cart-button-container">
-          <button className="cart-button" onClick={showCart}>
+          <button className="cart-button" onClick={() => dispatch({ type: "TOGGLE_CART" })}>
             <FontAwesomeIcon icon={faShoppingCart} />
           </button>
         </div>
-        {user && user.name && user.name.firstname && user.name.lastname && (
+        <div className="categories-container">
+          <button className="categories-button" onClick={toggleCategoryPopup}>
+            Categorías
+          </button>
+          {showCategoryPopup && (
+            <div className="category-popup">
+              <button className="category-button" onClick={resetCategoryFilter}>
+                Todas
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  className="category-button"
+                  onClick={() => filterProductsByCategory(category)}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {state.user && state.user.name && state.user.name.firstname && state.user.name.lastname && (
           <div
             className="initials-circle"
-            onClick={toggleUserInfo}
-            onMouseEnter={() => setShowUserInfo(true)}
-            onMouseLeave={() => setShowUserInfo(false)}
+            onClick={() => dispatch({ type: "TOGGLE_USER_INFO" })}
+            onMouseEnter={() => dispatch({ type: "TOGGLE_USER_INFO" })}
+            onMouseLeave={() => dispatch({ type: "TOGGLE_USER_INFO" })}
           >
             <span>
-              {user.name.firstname.charAt(0) + user.name.lastname.charAt(0)}
+              {state.user.name.firstname.charAt(0) + state.user.name.lastname.charAt(0)}
             </span>
           </div>
         )}
       </header>
       <div className="content">
-        {selectedProduct ? (
+        {state.selectedProduct ? (
           <div className="product-page">
             <div className="product-image">
               <img
-                src={selectedProduct.image}
-                alt={selectedProduct.title}
+                src={state.selectedProduct.image}
+                alt={state.selectedProduct.title}
                 className="small-image"
               />
             </div>
             <div className="product-info">
-              <h2>{selectedProduct.title}</h2>
-              <p>{selectedProduct.description}</p>
-              <p>${selectedProduct.price}</p>
-              <button onClick={() => addToCart(selectedProduct)}>Agregar al carrito</button>
+              <h2>{state.selectedProduct.title}</h2>
+              <p>{state.selectedProduct.description}</p>
+              <p>${state.selectedProduct.price}</p>
+              <button onClick={() => dispatch({ type: "ADD_TO_CART", payload: state.selectedProduct })}>
+                Agregar al carrito
+              </button>
             </div>
           </div>
         ) : (
           <div className="product-list">
-            {products.slice(0, showAllProducts ? undefined : 9).map((product) => (
+            {filteredProducts.slice(0, state.showAllProducts ? undefined : 9).map((product) => (
               <div
                 key={product.id}
                 className="product-card"
-                onClick={() => openProductInfo(product)}
+                onClick={() => dispatch({ type: "SET_SELECTED_PRODUCT", payload: product })}
               >
                 <h2>
                   <i>{product.title}</i>
@@ -157,42 +125,33 @@ function Stock() {
             ))}
           </div>
         )}
-        {showUserInfo && (
+        {state.showUserInfo && (
           <div className="user-info">
-            <p>Nombre: {user.name.firstname} {user.name.lastname}</p>
-            <p>Email: {user.email}</p>
-            <p>Teléfono: {user.phone}</p>
-            <p>Dirección: {user.address.street}, {user.address.city}</p>
+            <p>Nombre: {state.user.name.firstname} {state.user.name.lastname}</p>
+            <p>Email: {state.user.email}</p>
+            <p>Teléfono: {state.user.phone}</p>
+            <p>Dirección: {state.user.address.street}, {state.user.address.city}</p>
           </div>
         )}
       </div>
-
       <div className="button-container">
-        {selectedProduct ? (
-          <button onClick={() => setSelectedProduct(null)} className="button">
+        {state.selectedProduct ? (
+          <button onClick={() => dispatch({ type: "SET_SELECTED_PRODUCT", payload: null })} className="button">
             Volver a la lista
           </button>
         ) : (
           <button
-            onClick={() => setShowAllProducts(!showAllProducts)}
+            onClick={() => dispatch({ type: "TOGGLE_SHOW_ALL_PRODUCTS" })}
             className="button"
           >
-            {showAllProducts ? "Ver menos" : "Ver más"}
+            {state.showAllProducts ? "Ver menos" : "Ver más"}
           </button>
         )}
       </div>
-      <ShoppingCart
-        cart={cart}
-        isOpen={isCartOpen}
-        onClose={toggleCart}
-        removeFromCart={removeFromCart}
-        calculateTotal={calculateTotal}
-        removeAllFromCart={removeAllFromCart}
-      />
+      <ShoppingCart />
     </div>
   );
 }
-
 export default Stock;
 
 
